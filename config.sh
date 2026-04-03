@@ -17,7 +17,7 @@ CLAUDE_BIN="claude"
 CLAUDE_MODEL="haiku"
 
 # Minimal prompt — we just need to start the usage window.
-PING_PROMPT="hi"
+PING_PROMPT="hi how are you?"
 
 # Optional: cd into this directory before running claude.
 # Leave empty to use a temp directory.

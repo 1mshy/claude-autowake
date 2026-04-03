@@ -75,7 +75,7 @@ run_ping() {
 
     # Single message to haiku — just enough to start the usage window
     if (cd "$WORK_DIR" && "$CLAUDE_BIN" --print --model "$CLAUDE_MODEL" -p "$PING_PROMPT") \
-        >> "$LOG_FILE" 2>&1; then
+        2>&1 | tee -a "$LOG_FILE"; then
         end_time=$(date +%s)
         duration=$(( end_time - start_time ))
         log "=== Ping completed in ${duration}s ==="
