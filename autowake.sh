@@ -19,12 +19,13 @@ prune_logs() {
     local count
     count=$(find "$LOG_DIR" -name 'ping_*.log' -type f | wc -l | tr -d ' ')
     if (( count > MAX_LOG_FILES )); then
-        local to_delete=$(( count - MAX_LOG_FILES ))
-        find "$LOG_DIR" -name 'ping_*.log' -type f -print0 \
-            | sort -z \
-            | head -z -n "$to_delete" \
-            | xargs -0 rm -f
-        log "Pruned $to_delete old log file(s)"
+        # ls -1t sorts newest-first; tail grabs the oldest excess files
+        local pruned=0
+        for f in $(ls -1t "$LOG_DIR"/ping_*.log | tail -n +$(( MAX_LOG_FILES + 1 ))); do
+            rm -f "$f"
+            pruned=$(( pruned + 1 ))
+        done
+        log "Pruned $pruned old log file(s)"
     fi
 }
 
@@ -74,16 +75,26 @@ run_ping() {
     start_time=$(date +%s)
 
     # Single message to haiku — just enough to start the usage window
-    if (cd "$WORK_DIR" && "$CLAUDE_BIN" --print --model "$CLAUDE_MODEL" -p "$PING_PROMPT") \
-        2>&1 | tee -a "$LOG_FILE"; then
-        end_time=$(date +%s)
-        duration=$(( end_time - start_time ))
-        log "=== Ping completed in ${duration}s ==="
-    else
-        end_time=$(date +%s)
-        duration=$(( end_time - start_time ))
-        log "=== Ping failed after ${duration}s (exit code: $?) ==="
-    fi
+    local attempt
+    for attempt in 1 2; do
+        if (( attempt == 2 )); then
+            log "Retrying in 60 seconds..."
+            sleep 60
+            start_time=$(date +%s)
+        fi
+
+        if (cd "$WORK_DIR" && "$CLAUDE_BIN" --print --model "$CLAUDE_MODEL" -p "$PING_PROMPT") \
+            2>&1 | tee -a "$LOG_FILE"; then
+            end_time=$(date +%s)
+            duration=$(( end_time - start_time ))
+            log "=== Ping completed in ${duration}s ==="
+            return 0
+        else
+            end_time=$(date +%s)
+            duration=$(( end_time - start_time ))
+            log "=== Ping failed after ${duration}s (attempt $attempt/2) ==="
+        fi
+    done
 }
 
 # ── Entry point ───────────────────────────────────────────────────────

@@ -38,10 +38,28 @@ FIRST_TIME="${PING_TIMES[0]}"
 FIRST_HOUR=$((10#${FIRST_TIME%%:*}))
 FIRST_MINUTE=$((10#${FIRST_TIME##*:}))
 
+LAST_TIME="${PING_TIMES[-1]}"
+LAST_HOUR=$((10#${LAST_TIME%%:*}))
+LAST_MINUTE=$((10#${LAST_TIME##*:}))
+
+# ── Auto-calculate caffeinate duration if "auto" ───────────────────────
+if [[ "$CAFFEINATE_SECONDS" == "auto" ]]; then
+    first_total=$(( FIRST_HOUR * 60 + FIRST_MINUTE ))
+    last_total=$(( LAST_HOUR * 60 + LAST_MINUTE ))
+    span_minutes=$(( last_total - first_total + 10 ))  # +10 min buffer
+    if (( span_minutes < 10 )); then
+        span_minutes=10  # minimum 10 min for single-ping configs
+    fi
+    CAFFEINATE_SECONDS=$(( span_minutes * 60 ))
+fi
+
 echo "Ping schedule:"
 for t in "${PING_TIMES[@]}"; do
     echo "  $t"
 done
+if [[ "$WEEKDAYS_ONLY" == "true" ]]; then
+    echo "  (weekdays only)"
+fi
 echo ""
 
 # ── Preflight checks ─────────────────────────────────────────────────
@@ -71,13 +89,28 @@ CALENDAR_ENTRIES=""
 for time in "${PING_TIMES[@]}"; do
     hour=$((10#${time%%:*}))
     minute=$((10#${time##*:}))
-    CALENDAR_ENTRIES+="
+    if [[ "$WEEKDAYS_ONLY" == "true" ]]; then
+        # launchd Weekday: 1=Mon ... 5=Fri
+        for day in 1 2 3 4 5; do
+            CALENDAR_ENTRIES+="
+            <dict>
+                <key>Weekday</key>
+                <integer>$day</integer>
+                <key>Hour</key>
+                <integer>$hour</integer>
+                <key>Minute</key>
+                <integer>$minute</integer>
+            </dict>"
+        done
+    else
+        CALENDAR_ENTRIES+="
             <dict>
                 <key>Hour</key>
                 <integer>$hour</integer>
                 <key>Minute</key>
                 <integer>$minute</integer>
             </dict>"
+    fi
 done
 
 cat > "$PLIST_PATH" << EOF
@@ -121,6 +154,31 @@ EOF
 # ── Generate caffeinate launchd plist ─────────────────────────────────
 echo "Generating caffeinate plist at: $CAFFEINATE_PLIST"
 
+CAFF_CALENDAR=""
+if [[ "$WEEKDAYS_ONLY" == "true" ]]; then
+    CAFF_CALENDAR="    <array>"
+    for day in 1 2 3 4 5; do
+        CAFF_CALENDAR+="
+        <dict>
+            <key>Weekday</key>
+            <integer>$day</integer>
+            <key>Hour</key>
+            <integer>${FIRST_HOUR}</integer>
+            <key>Minute</key>
+            <integer>${FIRST_MINUTE}</integer>
+        </dict>"
+    done
+    CAFF_CALENDAR+="
+    </array>"
+else
+    CAFF_CALENDAR="    <dict>
+        <key>Hour</key>
+        <integer>${FIRST_HOUR}</integer>
+        <key>Minute</key>
+        <integer>${FIRST_MINUTE}</integer>
+    </dict>"
+fi
+
 cat > "$CAFFEINATE_PLIST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -138,12 +196,7 @@ cat > "$CAFFEINATE_PLIST" << EOF
     </array>
 
     <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>${FIRST_HOUR}</integer>
-        <key>Minute</key>
-        <integer>${FIRST_MINUTE}</integer>
-    </dict>
+${CAFF_CALENDAR}
 
     <key>StandardOutPath</key>
     <string>${LOG_DIR}/caffeinate_stdout.log</string>
@@ -179,15 +232,20 @@ fi
 
 WAKE_TIME=$(printf "%02d:%02d:00" "$WAKE_HOUR" "$WAKE_MINUTE")
 
-echo "Setting pmset wake schedule: daily at $WAKE_TIME"
+PMSET_DAYS="MTWRFSU"
+if [[ "$WEEKDAYS_ONLY" == "true" ]]; then
+    PMSET_DAYS="MTWRF"
+fi
+
+echo "Setting pmset wake schedule: $PMSET_DAYS at $WAKE_TIME"
 echo "  (This requires sudo — you may be prompted for your password)"
 echo ""
 
-if sudo pmset repeat wakeorpoweron MTWRFSU "$WAKE_TIME"; then
+if sudo pmset repeat wakeorpoweron "$PMSET_DAYS" "$WAKE_TIME"; then
     echo "  pmset wake scheduled successfully."
 else
     echo "  WARNING: Failed to set pmset wake schedule."
-    echo "  You can set it manually: sudo pmset repeat wakeorpoweron MTWRFSU $WAKE_TIME"
+    echo "  You can set it manually: sudo pmset repeat wakeorpoweron $PMSET_DAYS $WAKE_TIME"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────
@@ -200,7 +258,7 @@ for t in "${PING_TIMES[@]}"; do
 done
 echo ""
 echo "  Mac wakes at $WAKE_TIME (${WAKE_LEAD_MINUTES} min before first ping)"
-echo "  caffeinate keeps Mac awake for $(( CAFFEINATE_SECONDS / 3600 ))h"
+echo "  caffeinate keeps Mac awake for $(( CAFFEINATE_SECONDS / 60 )) min"
 echo ""
 echo "Logs:     $LOG_DIR"
 echo "Config:   $SCRIPT_DIR/config.sh"

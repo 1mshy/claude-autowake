@@ -6,9 +6,12 @@
 # Ping times in HH:MM (24-hour) format.
 # Must be >= 5 hours apart. install.sh will validate this.
 PING_TIMES=("06:00")
- 
+
 # Minutes before the first ping to wake the Mac from sleep.
 WAKE_LEAD_MINUTES=3
+
+# Only run on weekdays (Mon–Fri). Set to true to skip weekends.
+WEEKDAYS_ONLY=false
 
 # ── Claude CLI ────────────────────────────────────────────────────────
 CLAUDE_BIN="claude"
@@ -17,16 +20,17 @@ CLAUDE_BIN="claude"
 CLAUDE_MODEL="haiku"
 
 # Minimal prompt — we just need to start the usage window.
-PING_PROMPT="hi how are you?"
+PING_PROMPT="hi"
 
 # Optional: cd into this directory before running claude.
 # Leave empty to use a temp directory.
 PING_WORKING_DIR=""
 
 # ── Caffeinate ────────────────────────────────────────────────────────
-# Keep Mac awake for this many seconds after the first ping.
-# Default: 43200 = 12 hours (covers a full workday).
-CAFFEINATE_SECONDS=43200
+# Keep Mac awake after the first ping.
+# "auto" = calculated from ping times (first-to-last span + 10 min buffer).
+# Or set a number of seconds manually (e.g., 43200 = 12 hours).
+CAFFEINATE_SECONDS="auto"
 
 # ── Logging ───────────────────────────────────────────────────────────
 LOG_DIR="$HOME/.claude-autowake/logs"
