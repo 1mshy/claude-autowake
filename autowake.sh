@@ -63,8 +63,12 @@ acquire_lock() {
 
 # ── Main ping ─────────────────────────────────────────────────────────
 run_ping() {
+    # Pick a random message from the configured list
+    PING_PROMPT="${PING_MESSAGES[$((RANDOM % ${#PING_MESSAGES[@]}))]}"
+
     log "=== Claude Autowake Ping ==="
     log "Model: $CLAUDE_MODEL"
+    log "Message: $PING_PROMPT"
 
     # Verify claude is accessible
     if ! command -v "$CLAUDE_BIN" &>/dev/null; then

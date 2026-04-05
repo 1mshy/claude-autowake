@@ -19,8 +19,35 @@ CLAUDE_BIN="claude"
 # Model to use — haiku is cheapest, just enough to start the window.
 CLAUDE_MODEL="haiku"
 
-# Minimal prompt — we just need to start the usage window.
-PING_PROMPT="hi"
+# Messages to send — one is picked at random each ping.
+# Feel free to add, remove, or customize these.
+PING_MESSAGES=(
+    "hi"
+    "good morning"
+    "hey there"
+    "rise and shine"
+    "wakey wakey"
+    "top of the morning"
+    "hello world"
+    "gm"
+    "yo"
+    "howdy"
+    "greetings"
+    "sup"
+    "hola"
+    "bonjour"
+    "aloha"
+    "ahoy"
+    "hey hey"
+    "morning sunshine"
+    "lets go"
+    "ready to roll"
+    "reporting for duty"
+    "up and at em"
+    "new day new tokens"
+    "ping"
+    "wake up call"
+)
 
 # Extra flags to pass to the claude CLI (e.g., "--dangerouslySkipPermissions").
 CLAUDE_EXTRA_FLAGS=""
